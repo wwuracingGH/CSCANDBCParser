@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="DbcParserLib" Version="1.8.0" />
+    <PackageReference Include="Json5" Version="1.0.4" />
   </ItemGroup>
 
 </Project>
