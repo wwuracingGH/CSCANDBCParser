@@ -20,6 +20,9 @@
         data4.ForEach(x => Console.WriteLine(x));
         Console.WriteLine();
 
-        FileData.FromPath("crc/logs/11-10-2026_2132.log", obj).Print();
+        FileData.FromPath("can/logs/11-10-2026_2132.log", obj).Print();
+
+        JSONParser p = new JSONParser("ReprogrammingValues/repronodes.jsnx");
+        Console.WriteLine(p);
     } 
 }
