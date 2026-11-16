@@ -37,11 +37,11 @@ BU_:
 
 
 BO_ 1 TestInt: 8 Vector__XXX
- SG_ u8 : 0|8@1+ (1,0) [0|0] "" Vector__XXX
+ SG_ u8 : 0|8@1+ (0.5,0) [0|0] "" Vector__XXX
  SG_ s8 : 8|8@1- (1,0) [0|0] "" Vector__XXX
- SG_ s16 : 16|16@1- (1,0) [0|0] "" Vector__XXX
+ SG_ s16 : 16|16@1- (0.01,0) [0|0] "" Vector__XXX
  SG_ s24 : 32|24@1- (1,0) [0|0] "" Vector__XXX
- SG_ u8o : 56|8@1+ (1,0) [0|0] "" Vector__XXX
+ SG_ u8o : 56|8@1+ (0.5,0) [0|0] "" Vector__XXX
 
 BO_ 2 test64bit: 8 Vector__XXX
  SG_ signed64 : 0|64@1- (1,0) [0|0] "" Vector__XXX

@@ -1,6 +1,6 @@
 /*
  * Nicole Swierstra
- * Simple JSON Parser with some custom functionality and a new filetype "jsnx"
+ * Simple JSON Parser that works with json5 file format.
  * 
  * Imported from past project and converted from java
  * 
@@ -126,7 +126,7 @@ public class JSONParser {
 
         return null;
     }
-
+/*
     static string getObjString(Object obj)
     {
         string retstr = "";
@@ -152,4 +152,5 @@ public class JSONParser {
     public override string ToString() {
         getObjString(obj);
     }
+    */
 }

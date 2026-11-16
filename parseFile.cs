@@ -1,63 +1,24 @@
 using System.Text;
 
 class FileData {
-    abstract class DataStream {
-        public List<ulong> timestamp;
-        protected DataStream() {
-            timestamp = new List<ulong>();
-        }
-    }
-
-    class FloatStream: DataStream {
-        public List<float> data;
-        public FloatStream() : base()
+    private static DataStream GetStreamOfType(DBCObj.SignalInfo info) {
+        switch(info.type)
         {
-            data = new List<float>();
-        }
-    }
-
-    class DoubleStream: DataStream {
-        public List<double> data;
-        public DoubleStream() : base()
-        {
-            data = new List<double>();
-        }
-    }
-
-    class SignedStream: DataStream {
-        public List<long> data;
-        public SignedStream() : base()
-        {
-            data = new List<long>();
-        }
-    }
-
-    class UnsignedStream: DataStream {
-        public List<ulong> data;
-        public UnsignedStream() : base()
-        {
-            data = new List<ulong>();
-        }
-    }
-
-    private static DataStream GetStreamOfType(DBCObj.ChannelType type) {
-        switch(type)
-        {
-            case DBCObj.ChannelType.SignedInteger: return new SignedStream();
-            case DBCObj.ChannelType.UnsignedInteger: return new UnsignedStream();
-            case DBCObj.ChannelType.Float32: return new FloatStream();
-            case DBCObj.ChannelType.Float64: return new DoubleStream();
+            case DBCObj.SignalType.SignedInteger: return new SignedStream(info);
+            case DBCObj.SignalType.UnsignedInteger: return new UnsignedStream(info);
+            case DBCObj.SignalType.Float32: return new FloatStream(info);
+            case DBCObj.SignalType.Float64: return new DoubleStream(info);
         }
         return null; 
     } 
 
-    private static Type GetStreamType(DBCObj.ChannelType type) {
+    private static Type GetStreamType(DBCObj.SignalType type) {
         switch(type)
         {
-            case DBCObj.ChannelType.SignedInteger: return typeof(SignedStream);
-            case DBCObj.ChannelType.UnsignedInteger: return typeof(UnsignedStream);
-            case DBCObj.ChannelType.Float32: return typeof(FloatStream);
-            case DBCObj.ChannelType.Float64: return typeof(DoubleStream);
+            case DBCObj.SignalType.SignedInteger: return typeof(SignedStream);
+            case DBCObj.SignalType.UnsignedInteger: return typeof(UnsignedStream);
+            case DBCObj.SignalType.Float32: return typeof(FloatStream);
+            case DBCObj.SignalType.Float64: return typeof(DoubleStream);
         }
         return null; 
     } 
@@ -67,22 +28,20 @@ class FileData {
 
     private void AddToStream(DataStream ds, DBCObj.DataContainer container, ulong timestamp) {
         switch (container.datatype) {
-            case DBCObj.ChannelType.SignedInteger: 
-                (ds as SignedStream).data.Add(container.long_data);
+            case DBCObj.SignalType.SignedInteger: 
+                ds.append(timestamp, container.long_data);
             break;
-            case DBCObj.ChannelType.UnsignedInteger:
-                (ds as UnsignedStream).data.Add(container.ulong_data);
+            case DBCObj.SignalType.UnsignedInteger:
+                ds.append(timestamp, container.ulong_data);
             break;
-            case DBCObj.ChannelType.Float32: 
-                (ds as FloatStream).data.Add(container.float_data);
+            case DBCObj.SignalType.Float32: 
+                ds.append(timestamp, container.float_data);
             break;
-            case DBCObj.ChannelType.Float64: 
-                (ds as DoubleStream).data.Add(container.double_data);
+            case DBCObj.SignalType.Float64: 
+                ds.append(timestamp, container.double_data);
             break;
             default: return;
         }
-
-        ds.timestamp.Add(timestamp);
     }
 
     private void parseFilepath(string filepath) {
@@ -130,10 +89,10 @@ class FileData {
                         continue;
                     }
 
-                    var parsed = dbc.parseChannels((int)id, data);
+                    var parsed = dbc.parseSignalsFromFramedata((int)id, data);
                     Console.WriteLine(parsed.Count);
                     foreach (DBCObj.DataContainer c in parsed) {
-                        DataStream ds = channeldata[c.channel];
+                        DataStream ds = channeldata[c.signal_name];
                         AddToStream(ds, c, timestamp); 
                     }
                 }
@@ -145,7 +104,7 @@ class FileData {
         dbc = obj;
         channeldata = new Dictionary<string, DataStream>();
     
-        foreach (var x in dbc.getChannels())
+        foreach (var x in dbc.getAllSignalInfo())
         {
             channeldata.Add(x.Key, GetStreamOfType(x.Value));
         }
@@ -162,18 +121,58 @@ class FileData {
         {
             Console.WriteLine(s.Key + ":");
             int v = 0;
-            foreach (var ts in s.Value.timestamp)
+            foreach (var ts in s.Value.getTimestamps())
             {
                 Console.Write(ts + ": ");
-                if ((s.Value as SignedStream) != null)
-                    Console.WriteLine((s.Value as SignedStream).data[v]);
-                if ((s.Value as UnsignedStream) != null)
-                    Console.WriteLine((s.Value as UnsignedStream).data[v]);
-                if ((s.Value as FloatStream) != null)
-                    Console.WriteLine((s.Value as FloatStream).data[v]);
-                if ((s.Value as DoubleStream) != null)
-                    Console.WriteLine((s.Value as DoubleStream).data[v]);
+                Console.WriteLine(s.Value.strvalueof(v));
                 v++;
+            }
+        }
+    }
+
+    public void WriteToCSVFile(string filepath, int hz) {
+        DataStream timestamp_base;
+        if (!channeldata.TryGetValue("Latitude", out timestamp_base)) {
+            var e = channeldata.GetEnumerator();
+            while(e.Current.Value.getLength() == 0)
+            {
+                e.MoveNext();
+            }
+            timestamp_base = e.Current.Value;
+        }
+        ulong start = timestamp_base.getTimestamps().First();
+        ulong end = timestamp_base.getTimestamps().Last();
+        
+        List<ulong> new_timestamps = new List<ulong>();
+        for (ulong i = start; i <= end; i += (ulong)(1000000/hz)) {
+            new_timestamps.Add(i);
+        }
+
+        List<string> allchannelnames = new List<string>();
+        List<Array> allchannels = new List<Array>();
+        foreach (var d in channeldata) {
+            string channelname = d.Key;
+
+            allchannelnames.Append(channelname);
+            allchannels.Append(d.Value.resampleraw(new_timestamps.ToArray()));
+        }
+        using (StreamWriter wr = new StreamWriter(filepath, false)) {
+            for (int i = 0; i < allchannelnames.Count; i++) {
+                wr.Write(allchannelnames[i]);
+                if (i != allchannelnames.Count - 1) {
+                    wr.Write(',');
+                }
+            }
+
+            wr.WriteLine();
+            for (int i = 0; i < new_timestamps.Count; i++) {
+                for (int j = 0; j < allchannels.Count; j++)
+                {
+                    wr.Write(allchannels[j].GetValue(i).ToString());
+                    if (j != allchannels.Count - 1) {
+                        wr.Write(',');
+                    }
+                } 
             }
         }
     }
